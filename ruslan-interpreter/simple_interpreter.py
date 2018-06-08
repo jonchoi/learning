@@ -7,7 +7,7 @@
 #
 # EOF (end-of-file) token is used to indicate that
 # there is no more input left for lexical analysis
-INTEGER, PLUS, EOF, MINUS = 'INTEGER', 'PLUS', 'EOF', 'MINUS'
+INTEGER, PLUS, MINUS, EOF = 'INTEGER', 'PLUS', 'MINUS', 'EOF',
 
 class Token(object):
     def __init__(self, type, value):
@@ -41,52 +41,53 @@ class Interpreter(object):
         self.pos = 0
         # current token instance
         self.current_token = None
-        self.current_int_string = ''
+        # self.current_int_string = ''
+        self.current_char = self.text[self.pos]
 
     def error(self):
         raise Exception('Error parsing input')
+
+    def advance(self):
+        self.pos += 1
+        if self.pos > len(self.text) - 1:
+            self.current_char = None    # done
+        else:
+            self.current_char = self.text[self.pos]
+
+    def skip_whitespace(self):
+        if self.current_char.isspace() and self.current_char is not None:
+            self.advance()
+
+    def get_integer(self):
+        result = ''
+        while self.current_char is not None and self.current_char.isdigit():
+            result += self.current_char
+            self.advance()
+        return int(result)
 
     def get_next_token(self):
         """Lexical analyzer (also known as scanner or tokenizer)
 
         This method is responsible for breaking a sentence apart into tokens.
         """
-        text = self.text
+        while self.current_char is not None:
+            if self.current_char.isspace():
+                self.skip_whitespace()
 
-        # Done.
-        if self.pos > len(text) - 1:
-            return Token(EOF, None)
+            if self.current_char.isdigit():
+                return Token(INTEGER, self.get_integer())
 
-        current_char = text[self.pos]
+            if self.current_char == '+':
+                self.advance()
+                return Token(PLUS, '+')
 
-        if current_char.isspace():
-            self.pos += 1
-            current_char = text[self.pos]
+            if self.current_char == '-':
+                self.advance()
+                return Token(MINUS, '-')
 
-        if current_char.isdigit():
-            # collect digits
-            while current_char.isdigit() and not self.pos > len(text) - 1:
-                self.current_int_string = self.current_int_string + current_char
-                self.pos += 1
-                if not self.pos > len(text) - 1:
-                    current_char = text[self.pos]
+            self.error()
 
-            # return int token
-            token = Token(INTEGER, int(self.current_int_string))
-            self.current_int_string = ''
-            return token
-
-        if current_char == '+':
-            token = Token(PLUS, current_char)
-            self.pos += 1
-            return token
-
-        if current_char == '-':
-            token = Token(MINUS, current_char)
-            self.pos += 1
-            return token
-
-        self.error()
+        return Token(EOF, None)
 
     def eat(self, token_type):
         if self.current_token.type == token_type:
@@ -144,7 +145,7 @@ What is an interpreter?
 - interpreter takes source code and targets another language
 What is a compiler?
 - compiler takes source code and targets machine code
-What’s the difference between an interpreter and a compiler?
+Whats the difference between an interpreter and a compiler?
 - interpreter goes to another language, compiler down to machine language
 What is a token?
 - representation of a syntactic unit of the written representation of code
