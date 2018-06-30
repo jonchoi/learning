@@ -1,0 +1,6 @@
+[package]
+name = "tour-of-rust"
+version = "0.1.0"
+authors = ["Jon Choi <choi.jonathanh@gmail.com>"]
+
+[dependencies]
