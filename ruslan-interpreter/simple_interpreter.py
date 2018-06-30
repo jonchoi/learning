@@ -1,13 +1,10 @@
-# Exercises
-# - [x] multiple integers
-# - [x] whitespace
-# - [x] minus
-
 # Token types
 #
 # EOF (end-of-file) token is used to indicate that
 # there is no more input left for lexical analysis
-INTEGER, PLUS, MINUS, EOF = 'INTEGER', 'PLUS', 'MINUS', 'EOF',
+INTEGER, EOF = 'INTEGER', 'EOF'
+PLUS, MINUS, MULTIPLY, DIVIDE = 'PLUS', 'MINUS', 'MULTIPLY', 'DIVIDE'
+
 
 class Token(object):
     def __init__(self, type, value):
@@ -32,6 +29,7 @@ class Token(object):
     def __repr__(self):
         return self.__str__()
 
+
 class Interpreter(object):
     # object to text mapping?
     def __init__(self, text):
@@ -39,10 +37,9 @@ class Interpreter(object):
         self.text = text
         # self.pos is index of text
         self.pos = 0
-        # current token instance
         self.current_token = None
-        # self.current_int_string = ''
         self.current_char = self.text[self.pos]
+        self.phrase = []
 
     def error(self):
         raise Exception('Error parsing input')
@@ -65,6 +62,26 @@ class Interpreter(object):
             self.advance()
         return int(result)
 
+    def get_operator(self, char):
+        if char == '+':
+            self.advance()
+            return Token(PLUS, '+')
+
+        if char == '-':
+            self.advance()
+            return Token(MINUS, '-')
+
+        if char == '*':
+            self.advance()
+            return Token(MULTIPLY, '*')
+
+        if char == '/':
+            self.advance()
+            return Token(DIVIDE, '/')
+
+        print 'ain\'t no operarator here'
+        self.error()
+
     def get_next_token(self):
         """Lexical analyzer (also known as scanner or tokenizer)
 
@@ -73,19 +90,12 @@ class Interpreter(object):
         while self.current_char is not None:
             if self.current_char.isspace():
                 self.skip_whitespace()
+                continue
 
             if self.current_char.isdigit():
                 return Token(INTEGER, self.get_integer())
 
-            if self.current_char == '+':
-                self.advance()
-                return Token(PLUS, '+')
-
-            if self.current_char == '-':
-                self.advance()
-                return Token(MINUS, '-')
-
-            self.error()
+            return self.get_operator(self.current_char)
 
         return Token(EOF, None)
 
@@ -95,31 +105,92 @@ class Interpreter(object):
         else:
             self.error()
 
-    def expr(self):
-        """ integer plus integer """
+    def parse(self):
         self.current_token = self.get_next_token()
+        self.phrase.append(self.current_token)
+        while self.current_token.type is not EOF:
+            self.current_token = self.get_next_token()
+            self.phrase.append(self.current_token)
+        return self.phrase
 
-        left = self.current_token
-        self.eat(INTEGER)
+    def find_mult_div(self, phrase):
+        # for idx, token in phrase:
+        for token in phrase:
+            if token.type == MULTIPLY or token.type == DIVIDE:
+                print token
+                # return idx
+        return None
 
-        op = self.current_token
-        if op.type == PLUS:
-            self.eat(PLUS)
-        elif op.type == MINUS:
-            self.eat(MINUS)
-        else:
-            self.error()
+    def find_plus_minus(self, phrase):
+        for idx, token in phrase:
+            if token.type == PLUS or token.type == MINUS:
+                return idx
+        return None
 
-        right = self.current_token
-        self.eat(INTEGER)
-
-        if op.type == PLUS:
-            result = left.value + right.value
-        elif op.type == MINUS:
-            result = left.value - right.value
-        else:
-            self.error()
+    def apply_operator(self, op1, token, op2):
+        if token.type is not INTEGER and token.type is not EOF:
+            if token.type == PLUS:
+                result = op1.value + op2.value
+            elif token.type == MINUS:
+                result = op1.value - op2.value
+            elif token.type == MULTIPLY:
+                result = op1.value * op2.value
+            elif token.type == DIVIDE:
+                result = op1.value / op2.value
+            else:
+                self.error()
         return result
+
+    def calc_and_update_phrase(self, phrase, idx):
+        cache_phrase = []
+        cache_phrase = phrase
+
+        # find result
+        operator = cache_phrase[idx]
+        op1 = cache_phrase[idx-1]
+        op2 = cache_phrase[idx+1]
+        new_operand = Token(INTEGER, self.apply_operator(op1, operator, op2))
+
+        # update phrase with result
+        cache_phrase.pop(idx-1)
+        cache_phrase.pop(idx)
+        cache_phrase.pop(idx+1)
+        cache_phrase.insert(idx-1, new_operand)
+
+        return cache_phrase
+
+    def apply_mult_div(self):
+        # add checks for integers, indices etc.
+
+        cache_phrase = self.phrase
+        idx = self.find_mult_div(cache_phrase)  # index of mult/div
+
+        while idx is not None:  # there are mult/div ops left
+            cache_phrase = self.calc_and_update_phrase(cache_phrase, idx)
+
+        # update phrase post mult/div
+        self.phrase = cache_phrase
+
+    def apply_plus_minus(self):
+        cache_phrase = self.phrase
+        idx = self.find_plus_minus(cache_phrase)  # index of plus/minus
+
+        while idx is not None:  # there are mult/div ops left
+            cache_phrase = self.calc_and_update_phrase(cache_phrase, idx)
+
+        # update phrase post plus_minus
+        self.phrase = cache_phrase
+
+    def calculate(self, phrase):
+        self.parse()
+        self.apply_mult_div()
+        self.apply_plus_minus()
+        return self.phrase.value
+
+    def expr(self):
+        self.parse()  # stores to global
+        return self.calculate(self.phrase)
+
 
 def main():
     while True:
@@ -133,14 +204,15 @@ def main():
         result = interpreter.expr()
         print(result)
 
+
 # python bootstrap?
 if __name__ == '__main__':
     main()
 
 
-
 """ Check your knowledge
 
+# Part 1 Notes
 What is an interpreter?
 - interpreter takes source code and targets another language
 What is a compiler?
@@ -157,11 +229,26 @@ What are the other common names for that part of an interpreter or a compiler?
 - tokenizer, scanner
 
 
-I, Jon Choi, of being sound mind and body, do hereby pledge to commit to studying
-interpreters and compilers starting today and to get to a point where I know 100% 
-how they work.
+I, Jon Choi, of being sound mind and body, do hereby pledge to commit to
+studying interpreters and compilers starting today and to get to a point
+where I know 100% how they work.
 
 https://ruslanspivak.com/lsbasi-part1/
 
+
+# Part 2 Notes
+Lexer - strings into tokens
+Parser - recognizing a phrase in a stream of tokens
+Lexeme - sequence of characters that form a token
 """
 
+# Exercises
+# Part 1
+# - [x] multiple integers
+# - [x] whitespace
+# - [x] minus
+
+# Part 2
+# - [x] multiplication
+# - [x] division
+# - [ ] more number of operations
